@@ -21,4 +21,4 @@ jobs:
       - name: Print Hello & wait
         run: |
           echo "Hello, it worked fine ✅"
-          sleep 1000
+          sleep 20
