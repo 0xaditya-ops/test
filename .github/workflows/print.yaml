@@ -18,10 +18,7 @@ jobs:
           echo "Architecture: $(uname -m)"
           echo "Kernel: $(uname -r)"
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Run a sample script
+      - name: Print Hello & wait
         run: |
-          echo "Listing repo files..."
-          ls -lah
+          echo "Hello, it worked fine ✅"
+          sleep 1000
