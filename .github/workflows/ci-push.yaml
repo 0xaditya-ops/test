@@ -1,0 +1,29 @@
+name: Test Commit Push via PAT
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo using PAT
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.CI_PUSH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Make a dummy commit
+        run: |
+          echo "Last updated at: $(date)" > last_update.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add last_update.txt
+          git commit -m "chore: test commit by CI" || echo "No changes to commit"
+
+      - name: Push changes back
+        run: |
+          git push origin HEAD:${GITHUB_REF#refs/heads/}
