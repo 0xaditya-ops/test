@@ -68,12 +68,6 @@ jobs:
               echo "Failed to create nginx-deployment directory on $machine"
               continue
             }
-
-            # set permissions for nginx-deployment directory
-            ssh "ubuntu@$machine" "chmod 755 ~/bins/nginx-deployment" || {
-              echo "Failed to set permissions for nginx-deployment directory on $machine"
-              continue
-            }
             
             # Copy deploy script to fixed location (always override existing)
             scp scripts/binary-deployment/deploy-nginx.sh "ubuntu@$machine":~/bins/nginx-deployment/deploy-nginx.sh || {
