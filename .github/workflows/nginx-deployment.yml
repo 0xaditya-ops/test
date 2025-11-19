@@ -55,7 +55,14 @@ jobs:
 
       - name: Deploy nginx to machines
         run: |
-          while IFS= read -r machine; do
+          echo "Target machines to deploy:"
+          echo "${{ steps.determine_targets.outputs.machines }}"
+          echo "---"
+          
+          while IFS= read -r machine || [ -n "$machine" ]; do
+            # Trim whitespace
+            machine=$(echo "$machine" | xargs)
+            
             if [ -z "$machine" ]; then
               continue
             fi
@@ -99,4 +106,3 @@ jobs:
             echo "Successfully deployed nginx ${{ inputs.nginx_version }} to $machine"
             echo ""
           done <<< "${{ steps.determine_targets.outputs.machines }}"
-
