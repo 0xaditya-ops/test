@@ -65,7 +65,7 @@ jobs:
 
             # Create nginx-deployment directory if it doesn't exist (as ubuntu user, not root)
             # Use absolute path to avoid ~ expansion issues
-            # mkdir -p creates directories with default permissions (usually 755), no need for explicit chmod
+            # mkdir -p creates directories 
             ssh "ubuntu@$machine" "mkdir -p /home/ubuntu/bins/nginx-deployment" || {
               echo "Failed to create nginx-deployment directory on $machine"
               continue
