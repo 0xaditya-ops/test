@@ -8,8 +8,8 @@ on:
         required: true
         type: choice
         options:
-          - aztec-sequencer.ovh-rbx
-          - sepolia-archive.ovh-rbx
+          - 51.77.18.149
+          - 51.68.100.192
           - All of the above
       nginx_version:
         description: 'Nginx version to deploy (e.g., 1.25.3)'
@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ALL_MACHINES: |
-        aztec-sequencer.ovh-rbx
-        sepolia-archive.ovh-rbx
+        51.77.18.149
+        51.68.100.192
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
