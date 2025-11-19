@@ -6,11 +6,38 @@ if [ -f ~/bins/nginx-deployment/env_vars ]; then
   source ~/bins/nginx-deployment/env_vars
 fi
 
-sudo apt-get update
-sudo apt-get install -y "nginx=$NGINX_VERSION" || sudo apt-get install -y nginx
-
-if systemctl is-active --quiet nginx; then
-    sudo systemctl stop nginx
+# Validate NGINX_VERSION is set
+if [ -z "${NGINX_VERSION:-}" ]; then
+  echo "ERROR: NGINX_VERSION is not set"
+  exit 1
 fi
 
-sudo systemctl start nginx
+# Stop and remove existing nginx container if it exists
+if docker ps -a --format '{{.Names}}' | grep -q '^nginx$'; then
+  echo "Stopping and removing existing nginx container..."
+  docker stop nginx || true
+  docker rm nginx || true
+fi
+
+# Pull the specific nginx version
+echo "Pulling nginx:${NGINX_VERSION}..."
+docker pull "nginx:${NGINX_VERSION}"
+
+# Run nginx container with restart policy
+echo "Starting nginx container..."
+docker run -d \
+  --name nginx \
+  --restart unless-stopped \
+  -p 80:80 \
+  "nginx:${NGINX_VERSION}"
+
+# Verify container is running
+sleep 2
+if docker ps --format '{{.Names}}' | grep -q '^nginx$'; then
+  echo "Successfully deployed nginx:${NGINX_VERSION}"
+  docker ps --filter name=nginx --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+else
+  echo "ERROR: nginx container failed to start"
+  docker logs nginx
+  exit 1
+fi
