@@ -55,17 +55,24 @@ jobs:
 
       - name: Deploy nginx to machines
         run: |
+          set +e  # Don't exit on error, we handle errors in the loop
+          
+          machines_list="${{ steps.determine_targets.outputs.machines }}"
           echo "Target machines to deploy:"
-          echo "${{ steps.determine_targets.outputs.machines }}"
+          echo "$machines_list"
           echo "---"
           
-          while IFS= read -r machine || [ -n "$machine" ]; do
-            # Trim whitespace
-            machine=$(echo "$machine" | xargs)
-            
+          # Convert multiline string to array, filtering out empty lines
+          mapfile -t machines < <(echo "$machines_list" | grep -v '^[[:space:]]*$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          
+          echo "DEBUG: Found ${#machines[@]} machine(s) to deploy"
+          
+          for machine in "${machines[@]}"; do
             if [ -z "$machine" ]; then
+              echo "DEBUG: Skipping empty machine"
               continue
             fi
+            
             echo "========================================="
             echo "Deploying nginx ${{ inputs.nginx_version }} to: $machine"
             echo "========================================="
@@ -105,4 +112,8 @@ jobs:
             
             echo "Successfully deployed nginx ${{ inputs.nginx_version }} to $machine"
             echo ""
-          done <<< "${{ steps.determine_targets.outputs.machines }}"
+          done
+          
+          echo "========================================="
+          echo "Deployment process completed for all machines"
+          echo "========================================="
