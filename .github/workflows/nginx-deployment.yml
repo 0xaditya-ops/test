@@ -99,3 +99,4 @@ jobs:
             echo "Successfully deployed nginx ${{ inputs.nginx_version }} to $machine"
             echo ""
           done <<< "${{ steps.determine_targets.outputs.machines }}"
+
