@@ -1,108 +1,43 @@
-name: Nginx Deployment
+#!/usr/bin/env bash
+set -euo pipefail
 
-on:
-  workflow_dispatch:
-    inputs:
-      target_machine:
-        description: 'Target machine to deploy to'
-        required: true
-        type: choice
-        options:
-          - 51.77.18.149
-          - 51.68.100.192
-          - All of the above
-      nginx_version:
-        description: 'Nginx version to deploy (e.g., 1.25.3)'
-        required: true
-        type: string
+# Source environment variables if env_vars file exists
+if [ -f ~/bins/nginx-deployment/env_vars ]; then
+  source ~/bins/nginx-deployment/env_vars
+fi
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    env:
-      ALL_MACHINES: |
-        51.77.18.149
-        51.68.100.192
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+# Validate NGINX_VERSION is set
+if [ -z "${NGINX_VERSION:-}" ]; then
+  echo "ERROR: NGINX_VERSION is not set"
+  exit 1
+fi
 
-      - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+# Stop and remove existing nginx container if it exists
+if docker ps -a --format '{{.Names}}' | grep -q '^nginx$'; then
+  echo "Stopping and removing existing nginx container..."
+  docker stop nginx || true
+  docker rm nginx || true
+fi
 
-      - name: Determine target machines
-        id: determine_targets
-        run: |
-          if [ "${{ inputs.target_machine }}" == "All of the above" ]; then
-            echo "machines<<EOF" >> $GITHUB_OUTPUT
-            echo "${{ env.ALL_MACHINES }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "machines<<EOF" >> $GITHUB_OUTPUT
-            echo "${{ inputs.target_machine }}" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
+# Pull the specific nginx version
+echo "Pulling nginx:${NGINX_VERSION}..."
+docker pull "nginx:${NGINX_VERSION}"
 
-      - name: Add target machines to known hosts
-        run: |
-          while IFS= read -r machine; do
-            if [ -n "$machine" ]; then
-              ssh-keyscan -H "$machine" >> ~/.ssh/known_hosts || true
-            fi
-          done <<< "${{ steps.determine_targets.outputs.machines }}"
+# Run nginx container with restart policy
+echo "Starting nginx container..."
+docker run -d \
+  --name nginx \
+  --restart unless-stopped \
+  -p 80:80 \
+  "nginx:${NGINX_VERSION}"
 
-      - name: Deploy nginx to machines
-        run: |
-          echo "Target machines to deploy:"
-          echo "${{ steps.determine_targets.outputs.machines }}"
-          echo "---"
-          
-          while IFS= read -r machine || [ -n "$machine" ]; do
-            # Trim whitespace
-            machine=$(echo "$machine" | xargs)
-            
-            if [ -z "$machine" ]; then
-              continue
-            fi
-            echo "========================================="
-            echo "Deploying nginx ${{ inputs.nginx_version }} to: $machine"
-            echo "========================================="
-
-            # Create nginx-deployment directory if it doesn't exist (as ubuntu user, not root)
-            # Use absolute path to avoid ~ expansion issues
-            # mkdir -p creates directories 
-            ssh "ubuntu@$machine" "mkdir -p /home/ubuntu/bins/nginx-deployment" || {
-              echo "Failed to create nginx-deployment directory on $machine"
-              continue
-            }
-            
-            # Copy deploy script to fixed location (always override existing)
-            # Use absolute path to avoid ~ expansion issues with scp
-            scp scripts/binary-deployment/deploy-nginx.sh "ubuntu@$machine:/home/ubuntu/bins/nginx-deployment/deploy-nginx.sh" || {
-              echo "Failed to copy deploy script to $machine"
-              continue
-            }
-            
-            # Make script executable
-            ssh "ubuntu@$machine" "chmod +x /home/ubuntu/bins/nginx-deployment/deploy-nginx.sh" || {
-              echo "Failed to make deploy script executable on $machine"
-              continue
-            }
-            
-            # Create/override env_vars file with nginx version
-            ssh "ubuntu@$machine" "printf 'NGINX_VERSION=%s\n' '${{ inputs.nginx_version }}' > /home/ubuntu/bins/nginx-deployment/env_vars" || {
-              echo "Failed to create env_vars on $machine"
-              continue
-            }
-
-            # Execute deployment script from fixed location
-            ssh "ubuntu@$machine" "bash /home/ubuntu/bins/nginx-deployment/deploy-nginx.sh" || {
-              echo "Deployment failed on $machine"
-              continue
-            }
-            
-            echo "Successfully deployed nginx ${{ inputs.nginx_version }} to $machine"
-            echo ""
-          done <<< "${{ steps.determine_targets.outputs.machines }}"
+# Verify container is running
+sleep 2
+if docker ps --format '{{.Names}}' | grep -q '^nginx$'; then
+  echo "Successfully deployed nginx:${NGINX_VERSION}"
+  docker ps --filter name=nginx --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+else
+  echo "ERROR: nginx container failed to start"
+  docker logs nginx
+  exit 1
+fi
