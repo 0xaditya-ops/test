@@ -64,31 +64,33 @@ jobs:
             echo "========================================="
 
             # Create nginx-deployment directory if it doesn't exist (as ubuntu user, not root)
-            ssh "ubuntu@$machine" "mkdir -p ~/bins/nginx-deployment" || {
+            # Use absolute path to avoid ~ expansion issues
+            ssh "ubuntu@$machine" "mkdir -p /home/ubuntu/bins/nginx-deployment && chmod 755 /home/ubuntu/bins/nginx-deployment" || {
               echo "Failed to create nginx-deployment directory on $machine"
               continue
             }
             
             # Copy deploy script to fixed location (always override existing)
-            scp scripts/binary-deployment/deploy-nginx.sh "ubuntu@$machine":~/bins/nginx-deployment/deploy-nginx.sh || {
+            # Use absolute path to avoid ~ expansion issues with scp
+            scp scripts/binary-deployment/deploy-nginx.sh "ubuntu@$machine:/home/ubuntu/bins/nginx-deployment/deploy-nginx.sh" || {
               echo "Failed to copy deploy script to $machine"
               continue
             }
             
             # Make script executable
-            ssh "ubuntu@$machine" "chmod +x ~/bins/nginx-deployment/deploy-nginx.sh" || {
+            ssh "ubuntu@$machine" "chmod +x /home/ubuntu/bins/nginx-deployment/deploy-nginx.sh" || {
               echo "Failed to make deploy script executable on $machine"
               continue
             }
             
             # Create/override env_vars file with nginx version
-            ssh "ubuntu@$machine" "printf 'NGINX_VERSION=%s\n' '${{ inputs.nginx_version }}' > ~/bins/nginx-deployment/env_vars" || {
+            ssh "ubuntu@$machine" "printf 'NGINX_VERSION=%s\n' '${{ inputs.nginx_version }}' > /home/ubuntu/bins/nginx-deployment/env_vars" || {
               echo "Failed to create env_vars on $machine"
               continue
             }
 
             # Execute deployment script from fixed location
-            ssh "ubuntu@$machine" "bash ~/bins/nginx-deployment/deploy-nginx.sh" || {
+            ssh "ubuntu@$machine" "bash /home/ubuntu/bins/nginx-deployment/deploy-nginx.sh" || {
               echo "Deployment failed on $machine"
               continue
             }
