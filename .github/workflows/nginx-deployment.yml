@@ -63,14 +63,14 @@ jobs:
             echo "Deploying nginx ${{ inputs.nginx_version }} to: $machine"
             echo "========================================="
 
-            # Create nginx-deployment directory if it doesn't exist
-            ssh "ubuntu@$machine" "sudo mkdir -p ~/bins/nginx-deployment" || {
+            # Create nginx-deployment directory if it doesn't exist (as ubuntu user, not root)
+            ssh "ubuntu@$machine" "mkdir -p ~/bins/nginx-deployment" || {
               echo "Failed to create nginx-deployment directory on $machine"
               continue
             }
 
             # set permissions for nginx-deployment directory
-            ssh "ubuntu@$machine" "sudo chmod 755 ~/bins/nginx-deployment" || {
+            ssh "ubuntu@$machine" "chmod 755 ~/bins/nginx-deployment" || {
               echo "Failed to set permissions for nginx-deployment directory on $machine"
               continue
             }
