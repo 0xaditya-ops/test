@@ -1,0 +1,104 @@
+name: Nginx Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_machine:
+        description: 'Target machine to deploy to'
+        required: true
+        type: choice
+        options:
+          - aztec-sequencer.ovh-rbx
+          - sepolia-archive.ovh-rbx
+          - All of the above
+      nginx_version:
+        description: 'Nginx version to deploy (e.g., 1.25.3)'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      ALL_MACHINES: |
+        aztec-sequencer.ovh-rbx
+        sepolia-archive.ovh-rbx
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Determine target machines
+        id: determine_targets
+        run: |
+          if [ "${{ inputs.target_machine }}" == "All of the above" ]; then
+            echo "machines<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ env.ALL_MACHINES }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "machines<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ inputs.target_machine }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Add target machines to known hosts
+        run: |
+          while IFS= read -r machine; do
+            if [ -n "$machine" ]; then
+              ssh-keyscan -H "$machine" >> ~/.ssh/known_hosts || true
+            fi
+          done <<< "${{ steps.determine_targets.outputs.machines }}"
+
+      - name: Deploy nginx to machines
+        run: |
+          while IFS= read -r machine; do
+            if [ -z "$machine" ]; then
+              continue
+            fi
+            echo "========================================="
+            echo "Deploying nginx ${{ inputs.nginx_version }} to: $machine"
+            echo "========================================="
+
+            # Create nginx-deployment directory if it doesn't exist
+            ssh "$machine" "sudo mkdir -p ~/bins/nginx-deployment" || {
+              echo "Failed to create nginx-deployment directory on $machine"
+              continue
+            }
+
+            # set permissions for nginx-deployment directory
+            ssh "$machine" "sudo chmod 755 ~/bins/nginx-deployment" || {
+              echo "Failed to set permissions for nginx-deployment directory on $machine"
+              continue
+            }
+            
+            # Copy deploy script to fixed location (always override existing)
+            scp scripts/binary-deployment/deploy-nginx.sh "$machine":~/bins/nginx-deployment/deploy-nginx.sh || {
+              echo "Failed to copy deploy script to $machine"
+              continue
+            }
+            
+            # Make script executable
+            ssh "$machine" "chmod +x ~/bins/nginx-deployment/deploy-nginx.sh" || {
+              echo "Failed to make deploy script executable on $machine"
+              continue
+            }
+            
+            # Create/override env_vars file with nginx version
+            ssh "$machine" "printf 'NGINX_VERSION=%s\n' '${{ inputs.nginx_version }}' > ~/bins/nginx-deployment/env_vars" || {
+              echo "Failed to create env_vars on $machine"
+              continue
+            }
+
+            # Execute deployment script from fixed location
+            ssh "$machine" "bash ~/bins/nginx-deployment/deploy-nginx.sh" || {
+              echo "Deployment failed on $machine"
+              continue
+            }
+            
+            echo "Successfully deployed nginx ${{ inputs.nginx_version }} to $machine"
+            echo ""
+          done <<< "${{ steps.determine_targets.outputs.machines }}"
