@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_VARS_FILE="$SCRIPT_DIR/env_vars"
+
 # Source environment variables if env_vars file exists
-if [ -f ~/bins/nginx-deployment/env_vars ]; then
-  source ~/bins/nginx-deployment/env_vars
+if [ -f "$ENV_VARS_FILE" ]; then
+  source "$ENV_VARS_FILE"
 fi
 
 # Validate NGINX_VERSION is set
