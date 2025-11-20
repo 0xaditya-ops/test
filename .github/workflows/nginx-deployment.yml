@@ -15,6 +15,14 @@ on:
         description: 'Nginx version to deploy (e.g., 1.25.3)'
         required: true
         type: string
+      ssh_user:
+        description: 'SSH user for target machines'
+        required: true
+        type: choice
+        options:
+          - ubuntu
+          - ec2-user
+        default: ubuntu
 
 jobs:
   deploy:
@@ -57,9 +65,14 @@ jobs:
         run: |
           set +e  # Don't exit on error, we handle errors in the loop
           
+          ssh_user="${{ inputs.ssh_user }}"
+          home_dir="/home/$ssh_user"
+          
           machines_list="${{ steps.determine_targets.outputs.machines }}"
           echo "Target machines to deploy:"
           echo "$machines_list"
+          echo "Using SSH user: $ssh_user"
+          echo "Home directory: $home_dir"
           echo "---"
           
           # Convert multiline string to array, filtering out empty lines
@@ -74,38 +87,37 @@ jobs:
             fi
             
             echo "========================================="
-            echo "Deploying nginx ${{ inputs.nginx_version }} to: $machine"
+            echo "Deploying nginx ${{ inputs.nginx_version }} to: $machine (user: $ssh_user)"
             echo "========================================="
 
-            # Create nginx-deployment directory if it doesn't exist (as ubuntu user, not root)
+            # Create nginx-deployment directory if it doesn't exist
             # Use absolute path to avoid ~ expansion issues
-            # mkdir -p creates directories 
-            ssh "ubuntu@$machine" "mkdir -p /home/ubuntu/bins/nginx-deployment" || {
+            ssh "$ssh_user@$machine" "mkdir -p $home_dir/bins/nginx-deployment" || {
               echo "Failed to create nginx-deployment directory on $machine"
               continue
             }
             
             # Copy deploy script to fixed location (always override existing)
             # Use absolute path to avoid ~ expansion issues with scp
-            scp scripts/binary-deployment/deploy-nginx.sh "ubuntu@$machine:/home/ubuntu/bins/nginx-deployment/deploy-nginx.sh" || {
+            scp scripts/binary-deployment/deploy-nginx.sh "$ssh_user@$machine:$home_dir/bins/nginx-deployment/deploy-nginx.sh" || {
               echo "Failed to copy deploy script to $machine"
               continue
             }
             
             # Make script executable
-            ssh "ubuntu@$machine" "chmod +x /home/ubuntu/bins/nginx-deployment/deploy-nginx.sh" || {
+            ssh "$ssh_user@$machine" "chmod +x $home_dir/bins/nginx-deployment/deploy-nginx.sh" || {
               echo "Failed to make deploy script executable on $machine"
               continue
             }
             
             # Create/override env_vars file with nginx version
-            ssh "ubuntu@$machine" "printf 'NGINX_VERSION=%s\n' '${{ inputs.nginx_version }}' > /home/ubuntu/bins/nginx-deployment/env_vars" || {
+            ssh "$ssh_user@$machine" "printf 'NGINX_VERSION=%s\n' '${{ inputs.nginx_version }}' > $home_dir/bins/nginx-deployment/env_vars" || {
               echo "Failed to create env_vars on $machine"
               continue
             }
 
             # Execute deployment script from fixed location
-            ssh "ubuntu@$machine" "bash /home/ubuntu/bins/nginx-deployment/deploy-nginx.sh" || {
+            ssh "$ssh_user@$machine" "bash $home_dir/bins/nginx-deployment/deploy-nginx.sh" || {
               echo "Deployment failed on $machine"
               continue
             }
