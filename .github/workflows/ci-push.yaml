@@ -1,13 +1,15 @@
 name: Test Commit Push via PAT
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   test-push:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repo using PAT
