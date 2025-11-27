@@ -1,91 +1,20 @@
 on:
   workflow_dispatch:
     inputs:
-      target_machine:
-        description: 'Target machine to deploy to'
+      options:
+        description: 'Options for your choice: '
         required: true
         type: choice
         options:
-          - btcs-eth-bid-submitter-mainnet.ovh-rbx
-          - eth-bid-submitter-mainnet.ovh-tk
-          - eth-bid-submitter-mainnet.ovh-rbx
-          - eth-bid-submitter-mainnet.ovh-vin
-          - eth-bid-submitter-hoodi.ovh-rbx
-          - eth-bid-submitter-mainnet.lat-ash
-          - eth-bid-submitter-mainnet.aws-fr
-          - eth-bid-submitter-mainnet.aws-nv
-          - eth-bid-submitter-mainnet.aws-oh
-          - eth-bid-submitter-holesky.aws-nv
-          - All of the above
-      version:
-        description: 'version to deploy (e.g., zen3-v3.0.23-alpha.37 )'
-        required: true
-        type: string
-      ssh_user:
-        description: 'SSH user for target machines'
-        required: true
-        type: choice
-        options:
-          - ubuntu
-          - ec2-user
+          - option 1
+          - option 2
+          - option 3
+          - option 4
           
 jobs:
   deploy:
     runs-on: self-hosted-runners
-    env:
-      ALL_MACHINES: |
-        btcs-eth-bid-submitter-mainnet.ovh-rbx
-        eth-bid-submitter-mainnet.ovh-tk
-        eth-bid-submitter-mainnet.ovh-rbx
-        eth-bid-submitter-mainnet.ovh-vin
-        eth-bid-submitter-hoodi.ovh-rbx
-        eth-bid-submitter-mainnet.lat-ash
-        eth-bid-submitter-mainnet.aws-fr
-        eth-bid-submitter-mainnet.aws-nv
-        eth-bid-submitter-mainnet.aws-oh
-        eth-bid-submitter-holesky.aws-nv
-      REPO: gattaca-com/builder
-      BINS: "bid-submitter-2 data_gather"
-
-    permissions:
-      id-token: write
-      contents: read
+    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
-    - name: Setup Teleport
-      uses: teleport-actions/setup@v1
-      with:
-        version: auto
-        proxy: teleport.internal-gtc.com:443
-
-    - name: Authenticate with Teleport
-      uses: teleport-actions/auth@v2
-      with:
-        proxy: teleport.internal-gtc.com:443
-        token: github-ci-bot
-        certificate-ttl: 1h
-        anonymous-telemetry: 1
-
-    - name: Determine target machines
-      id: targets
-      run: |
-        if [ "${{ inputs.target_machine }}" == "All of the above" ]; then
-          echo "machines<<EOF" >> $GITHUB_OUTPUT
-          echo "${{ env.ALL_MACHINES }}" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        else
-          echo "machines<<EOF" >> $GITHUB_OUTPUT
-          echo "${{ inputs.target_machine }}" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Deploy to target machines
-      run: |
-        chmod +x scripts/binary-deployment/ci-deploy.sh
-        scripts/binary-deployment/ci-deploy.sh \
-          "${{ inputs.ssh_user }}" \
-          "${{ inputs.version }}" \
-          "${{ env.BINS }}" \
-          "${{ steps.targets.outputs.machines }}"
