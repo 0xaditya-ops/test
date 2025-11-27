@@ -18,3 +18,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Selected option
+      run: |
+        echo "Selected option: ${{ inputs.options }}"
+        echo "Completed"
